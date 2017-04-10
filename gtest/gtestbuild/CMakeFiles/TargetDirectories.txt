@@ -1,0 +1,8 @@
+/Users/liaoyuze/tttt/googletest/googletest/gtestbuild/CMakeFiles/install/local.dir
+/Users/liaoyuze/tttt/googletest/googletest/gtestbuild/CMakeFiles/list_install_components.dir
+/Users/liaoyuze/tttt/googletest/googletest/gtestbuild/CMakeFiles/rebuild_cache.dir
+/Users/liaoyuze/tttt/googletest/googletest/gtestbuild/CMakeFiles/edit_cache.dir
+/Users/liaoyuze/tttt/googletest/googletest/gtestbuild/CMakeFiles/install/strip.dir
+/Users/liaoyuze/tttt/googletest/googletest/gtestbuild/CMakeFiles/install.dir
+/Users/liaoyuze/tttt/googletest/googletest/gtestbuild/CMakeFiles/gtest_main.dir
+/Users/liaoyuze/tttt/googletest/googletest/gtestbuild/CMakeFiles/gtest.dir
