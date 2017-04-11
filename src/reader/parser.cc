@@ -54,9 +54,7 @@ void LibsvmParser::Parse(const StringList& list, DMatrix& matrix, std::vector<in
     m_items.clear();
     SplitStringUsing(list[i], m_splitor.c_str(), &m_items);
     int len = m_items.size();
-    //printf("11\n");
     if (len == 1) {
-      //printf("12\n");
       int row_length = atoi(m_items[0].c_str());
       sampled_length.push_back(row_length);
       matrix.row_len--;
@@ -75,22 +73,17 @@ void LibsvmParser::Parse(const StringList& list, DMatrix& matrix, std::vector<in
       matrix.Y.push_back(tmp_y);
       continue;
     }
-    //printf("13\n");
     CHECK_NOTNULL(matrix.row[row_pos]);
     matrix.row[row_pos]->Resize(--len);
     // add bias term.
     matrix.row[row_pos]->id = atoi(m_items[0].c_str());
-    //printf("14\n");
     for (int j = 0; j < len; ++j) {
       m_single_item.clear();
-      //printf("%s\n", m_items[j+1].c_str());
       SplitStringUsing(m_items[j + 1], ":", &m_single_item);
-      //printf("i is %zu %s %s\n", i, m_single_item[0].c_str(), m_single_item[1].c_str());
       CHECK_EQ(m_single_item.size(), 2);
       matrix.row[row_pos]->idx[j] = atoi(m_single_item[0].c_str());
       matrix.row[row_pos]->X[j] = atof(m_single_item[1].c_str());
     }
-    //printf("15\n");
   }
 }
 /*

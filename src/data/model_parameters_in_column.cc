@@ -43,23 +43,23 @@ static const real_t kInitStdev = 0.01;
 Model::Model(size_t parameter_num, UpdaterType type, bool gaussian) :
   parameters_num_(parameter_num), updater_type_(type) {
   CHECK_GE(parameters_num_, 0);
-  //try {
-    //parameters_.resize(parameters_num_, 0.0);
-    //if (updater_type_ == AdaGrad || updater_type_ == Momentum
-      //  || updater_type_ == RMSprop) {
-      //param_cache_.resize(parameters_num_, 0.0);
-    //} else if (updater_type_ == AdaDelta || updater_type_ == Adam) {
-      //param_cache_.resize(parameters_num_, 0.0);
-      //param_cache_2_.resize(parameters_num_, 0.0);
-    //}
+  try {
+    parameters_.resize(parameters_num_, 0.0);
+    if (updater_type_ == AdaGrad || updater_type_ == Momentum
+        || updater_type_ == RMSprop) {
+      param_cache_.resize(parameters_num_, 0.0);
+    } else if (updater_type_ == AdaDelta || updater_type_ == Adam) {
+      param_cache_.resize(parameters_num_, 0.0);
+      param_cache_2_.resize(parameters_num_, 0.0);
+    }
     if (gaussian) {
       InitModelUsingGaussian();
     }
-  //} catch (std::bad_alloc&) {
-    //LOG(FATAL) << "Cannot allocate enough memory for current      \
-      //             model parameters. Parameter size: "
-        //       << parameters_num_;
-  //}
+  } catch (std::bad_alloc&) {
+    LOG(FATAL) << "Cannot allocate enough memory for current      \
+                   model parameters. Parameter size: "
+               << parameters_num_;
+  }
 }
 
 // Initialize model from a checkpoint file.
@@ -75,24 +75,24 @@ void Model::SaveModel(const std::string& filename) {
   FILE* file_ptr_param =
       OpenFileOrDie(StringPrintf("%s_param", filename.c_str()).c_str(), "w");
   // Write param
-  WriteVectorToFile<index_t, real_t>(file_ptr_param, this->parameters_);
+  WriteVectorToFile<real_t>(file_ptr_param, this->parameters_);
   Close(file_ptr_param);
   // Write param_cache
-  //if (updater_type_ == AdaGrad || updater_type_ == Momentum
-    //  || updater_type_ == RMSprop) {
-    //FILE* file_ptr_param_cache =
-      //  OpenFileOrDie(StringPrintf("%s_cache", filename.c_str()).c_str(), "w");
-    //WriteVectorToFile<real_t>(file_ptr_param_cache, this->param_cache_);
-    //Close(file_ptr_param_cache);
-  //} else if (updater_type_ == AdaDelta || updater_type_ == Adam) {
-    //FILE* file_ptr_param_cache =
-      //  OpenFileOrDie(StringPrintf("%s_cache", filename.c_str()).c_str(), "w");
-    //FILE* file_ptr_param_cache_2 =
-        //OpenFileOrDie(StringPrintf("%s_cache_2", filename.c_str()).c_str(), "w");
-    //WriteVectorToFile<real_t>(file_ptr_param_cache, this->param_cache_);
-    //WriteVectorToFile<real_t>(file_ptr_param_cache_2, this->param_cache_2_);
-    //Close(file_ptr_param_cache_2);
-  //}
+  if (updater_type_ == AdaGrad || updater_type_ == Momentum
+      || updater_type_ == RMSprop) {
+    FILE* file_ptr_param_cache =
+        OpenFileOrDie(StringPrintf("%s_cache", filename.c_str()).c_str(), "w");
+    WriteVectorToFile<real_t>(file_ptr_param_cache, this->param_cache_);
+    Close(file_ptr_param_cache);
+  } else if (updater_type_ == AdaDelta || updater_type_ == Adam) {
+    FILE* file_ptr_param_cache =
+        OpenFileOrDie(StringPrintf("%s_cache", filename.c_str()).c_str(), "w");
+    FILE* file_ptr_param_cache_2 =
+        OpenFileOrDie(StringPrintf("%s_cache_2", filename.c_str()).c_str(), "w");
+    WriteVectorToFile<real_t>(file_ptr_param_cache, this->param_cache_);
+    WriteVectorToFile<real_t>(file_ptr_param_cache_2, this->param_cache_2_);
+    Close(file_ptr_param_cache_2);
+  }
 }
 
 // Deserialize model from a checkpoint file.
@@ -101,11 +101,11 @@ void Model::LoadModel(const std::string& filename) {
   FILE* file_ptr_param =
       OpenFileOrDie(StringPrintf("%s_param", filename.c_str()).c_str(), "r");
   // Load param
-  ReadVectorFromFile<index_t, real_t>(file_ptr_param, this->parameters_);
+  ReadVectorFromFile<real_t>(file_ptr_param, this->parameters_);
   parameters_num_ = parameters_.size();
   Close(file_ptr_param);
   // Load param_cache
-  /*if (updater_type_ == AdaGrad || updater_type_ == Momentum
+  if (updater_type_ == AdaGrad || updater_type_ == Momentum
       || updater_type_ == RMSprop) {
     FILE* file_ptr_param_cache =
         OpenFileOrDie(StringPrintf("%s_cache", filename.c_str()).c_str(), "r");
@@ -120,7 +120,7 @@ void Model::LoadModel(const std::string& filename) {
     ReadVectorFromFile<real_t>(file_ptr_param_cache_2, this->param_cache_2_);
     Close(file_ptr_param_cache);
     Close(file_ptr_param_cache_2);
-  }*/
+  }
 }
 
 // Reset current model to init state.
@@ -131,25 +131,24 @@ void Model::Reset(bool gaussian) {
     for (size_t i = 0; i < parameters_num_; ++i) {
       parameters_[i] = 0.0;
     }
-    //parameters_.clear();
   }
 }
 
-// Save model parameters to a temp vector
-void Model::Saveweight(std::unordered_map<index_t, real_t>& hash_map) {
-  //CHECK_EQ(parameters_num_, hash_map.size());
-  parameters_.swap(hash_map);
+// Save model parameters to a tmp vector
+void Model::Saveweight(std::vector<real_t>& vec) {
+  CHECK_EQ(parameters_num_, vec.size());
+  copy(parameters_.begin(), parameters_.end(), vec.begin());
 }
 
 // Load model parameters from a temp vector
-void Model::Loadweight(std::unordered_map<index_t, real_t>& hash_map) {
-  //CHECK_EQ(parameters_num_, vec.size());
-  parameters_.swap(hash_map);
+void Model::Loadweight(const std::vector<real_t>& vec) {
+  CHECK_EQ(parameters_num_, vec.size());
+  copy(vec.begin(), vec.end(), parameters_.begin());
 }
 
 // Initialize model parameters using Gaussian distribution.
 void Model::InitModelUsingGaussian() {
-//CHECK_EQ(parameters_num_, parameters_.size());
+  CHECK_EQ(parameters_num_, parameters_.size());
   for (size_t i = 0; i < parameters_num_; ++i) {
     parameters_[i] = ran_gaussion(kInitMean, kInitStdev);
   }
@@ -159,14 +158,15 @@ void Model::InitModelUsingGaussian() {
 void Model::RemoveModelFile(const std::string filename) {
   // Remove model file
   RemoveFile(StringPrintf("%s_param", filename.c_str()).c_str());
- /* if (updater_type_ == AdaGrad || updater_type_ == Momentum
+  if (updater_type_ == AdaGrad || updater_type_ == Momentum
       || updater_type_ == RMSprop) {
     RemoveFile(StringPrintf("%s_cache", filename.c_str()).c_str());
   } else if (updater_type_ == AdaDelta || updater_type_ == Adam) {
     RemoveFile(StringPrintf("%s_cache", filename.c_str()).c_str());
     RemoveFile(StringPrintf("%s_cache_2", filename.c_str()).c_str());
-  }*/
+  }
 }
+
 
 //------------------------------------------------------------------------------
 // The Gradient class

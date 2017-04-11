@@ -23,7 +23,6 @@ This file contains facilitlies controlling the file I/O.
 #ifndef F2M_BASE_FILE_UTIL_H_
 #define F2M_BASE_FILE_UTIL_H_
 
-#include <unordered_map>
 #include <stdio.h> // for remove()
 
 #include "src/base/common.h"
@@ -96,21 +95,23 @@ inline void RemoveFile(const char* filename) {
 //------------------------------------------------------------------------------
 
 // Serialize a vector to a buffer. Return the buffer size.
-template <typename Key, typename T>
-size_t serialize_hash_map(const std::unordered_map<Key, T>& hash_map, char* &buf) {
+template <typename T>
+size_t serialize_vector(const std::vector<T>& vec, char* &buf) {
   static size_t elem_size = sizeof(T);
   static size_t len_size = sizeof(size_t);
-  CHECK_GT(hash_map.size(), 0);
+  CHECK_GT(vec.size(), 0);
   // The first element is the length of vector
-  size_t buffer_size = elem_size * hash_map.size() + len_size;
+  size_t buffer_size = elem_size * vec.size() + len_size;
   buf = new char[buffer_size];
-  size_t map_len = hash_map.size();
-  memcpy(buf, reinterpret_cast<char*>(&map_len), len_size);
+  size_t vec_len = vec.size();
+  memcpy(buf, reinterpret_cast<char*>(&vec_len), len_size);
   // The last elements
   size_t total_size = len_size;
-  typename std::unordered_map<Key, T>::const_iterator p = hash_map.begin();
-  for (size_t i = 0; i < map_len; ++i) {
-    *((T *)(buf + total_size)) = (p++)->second;
+  T* p = (T*)vec.data();
+  for (size_t i = 0; i < vec.size(); ++i) {
+    memcpy(buf + total_size,
+           reinterpret_cast<char*>(p+i),
+           elem_size);
     total_size += elem_size;
   }
 
@@ -118,49 +119,50 @@ size_t serialize_hash_map(const std::unordered_map<Key, T>& hash_map, char* &buf
 }
 
 // Deserialize a vector from a buffer.
-template <typename Key, typename T>
-void deserialize_hash_map(char* buf, size_t buf_len, std::unordered_map<Key, T>& hash_map) {
+template <typename T>
+void deserialize_vector(char* buf, size_t buf_len, std::vector<T>& vec) {
   static size_t elem_size = sizeof(T);
   static size_t len_size = sizeof(size_t);
   CHECK_NOTNULL(buf);
   // Parse the first length
-  size_t map_len = 0;
-  memcpy(&map_len, buf, len_size);
-  CHECK_GT(map_len, 0);
+  size_t vec_len = 0;
+  memcpy(&vec_len, buf, len_size);
+  CHECK_GT(vec_len, 0);
+  vec.resize(vec_len);
   // Parse the last elements
   size_t index = 0;
   for (size_t i = len_size; i < buf_len; i+=elem_size) {
     T* value = reinterpret_cast<T*>(buf + i);
-    hash_map[index++] = *value;
+    vec[index++] = *value;
   }
-  CHECK_EQ(index, hash_map.size());
+  CHECK_EQ(index, vec.size());
 }
 
 // Write a vector to disk file.
-template <typename Key, typename T>
-void WriteVectorToFile(FILE* file_ptr, const std::unordered_map<Key, T>& hash_map) {
+template <typename T>
+void WriteVectorToFile(FILE* file_ptr, const std::vector<T>& vec) {
   char* buf = nullptr;
-  size_t buf_len = serialize_hash_map(hash_map, buf);
+  size_t buf_len = serialize_vector(vec, buf);
   CHECK_EQ(WriteDataToDisk(file_ptr, buf, buf_len), buf_len);
   delete [] buf;
 }
 
 // Read a vector from disk file.
-template <typename Key, typename T>
-void ReadVectorFromFile(FILE* file_ptr, std::unordered_map<Key, T>& hash_map) {
+template <typename T>
+void ReadVectorFromFile(FILE* file_ptr, std::vector<T>& vec) {
   static size_t len_size = sizeof(size_t);
   // Read the size of vector
-  size_t map_len = 0;
-  CHECK_GT(fread(reinterpret_cast<char*>(&map_len),
+  size_t vec_len = 0;
+  CHECK_GT(fread(reinterpret_cast<char*>(&vec_len),
                  1,
                  len_size,
                  file_ptr), 0);
   // Read the last elements
-  size_t buf_len = sizeof(T) * map_len + len_size;
+  size_t buf_len = sizeof(T) * vec_len + len_size;
   char* buf = new char[buf_len];
-  memcpy(buf, reinterpret_cast<char*>(&map_len), len_size);
+  memcpy(buf, reinterpret_cast<char*>(&vec_len), len_size);
   ReadDataFromDisk(file_ptr, buf+len_size, buf_len-len_size);
-  deserialize_hash_map(buf, buf_len, hash_map);
+  deserialize_vector(buf, buf_len, vec);
   delete [] buf;
 }
 

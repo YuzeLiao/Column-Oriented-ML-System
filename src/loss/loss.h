@@ -88,8 +88,8 @@ class Loss {
 
   // Calculate wTx.
   virtual void wTx(const DMatrix* matrix,
-                     std::unordered_map<index_t, real_t>* w,
-                     std::vector<real_t>& result);
+                   std::vector<real_t>* w,
+                   std::vector<real_t>& result);
 
   std::vector<real_t> result;
   Gradient* grad_;   // Storing gradient in dense model

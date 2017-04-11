@@ -58,13 +58,13 @@ class Model {
   void LoadModel(const std::string& filename);
 
   // Get the pointer of current model parameters.
-  inline std::unordered_map<index_t, real_t>* GetParameter() { return &parameters_; }
+  inline std::vector<real_t>* GetParameter() { return &parameters_; }
 
   // Get the pointer of current model cache_1.
- // inline std::vector<real_t>* GetParamCache() { return &param_cache_; }
+  inline std::vector<real_t>* GetParamCache() { return &param_cache_; }
 
   // Get the pointer of current model cache_2.
- // inline std::vector<real_t>* GetParamCache_2() { return &param_cache_2_; }
+  inline std::vector<real_t>* GetParamCache_2() { return &param_cache_2_; }
 
   // Get the length of current model parameters.
   inline index_t GetLength() { return parameters_num_; }
@@ -73,16 +73,16 @@ class Model {
   void Reset(bool gaussion = false);
 
   // Save model parameters to a temp vector.
-  void Saveweight(std::unordered_map<index_t, real_t>& hash_map);
+  void Saveweight(std::vector<real_t>& vec);
 
   // Load model parameters from a temp vector.
-  void Loadweight(std::unordered_map<index_t, real_t>& hash_map);
+  void Loadweight(const std::vector<real_t>& vec);
 
   // Delete the model file and cahce file.
   void RemoveModelFile(const std::string filename);
 
  protected:
-  std::unordered_map<index_t, real_t> parameters_;       // Storing the model parameters.
+  std::vector<real_t> parameters_;       // Storing the model parameters.
   std::vector<real_t> param_cache_;      // Cache_1 for some parameter update functions.
   std::vector<real_t> param_cache_2_;    // Cache_2 for some parameter update functions.
   size_t              parameters_num_;   // Number of model parameters.

@@ -1,5 +1,5 @@
 # Build library loss
-add_library(loss loss.cc logit_loss.cc) #linear_loss.cc fm_loss.cc ffm_loss.cc svm_loss.cc)
+add_library(loss loss.cc logit_loss.cc fm_loss.cc) #linear_loss.cc fm_loss.cc ffm_loss.cc svm_loss.cc)
 
 # Build unittests.
 set(LIBS data base loss gtest thread reader)

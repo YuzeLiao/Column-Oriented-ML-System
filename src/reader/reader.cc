@@ -83,20 +83,10 @@ void InmemReader::Initialize(const std::string& filename,
   // Initialize the DMatrix buffer
   int num_lines = GetLineNumber(buffer.get(), read_size);
   bool if_has_field = type == FFM ? true : false;
-  //printf("1\n");
-  //data_buf_.Resize(num_lines);
-  //data_buf_.InitSparseRow(if_has_field);
-  // Initialize order
-  /*order_.resize(num_lines);
-  for (int i = 0; i < num_lines; ++i) {
-    order_[i] = i;
-  }*/
   // Parse each line of data from buffer
   StringList list(num_lines);
-  //printf("2\n");
   scoped_array<char> line(new char[kMaxLineSize]);
   uint64 start_pos = 0;
-  //printf("3\n");
   for (int i = 0; i < num_lines; ++i) {
     uint32 line_size = ReadLineFromMemory(line.get(),
                                           buffer.get(),
@@ -112,19 +102,13 @@ void InmemReader::Initialize(const std::string& filename,
     list[i].assign(line.get());
   }
   // Parse StringList to DMatrix.
-  //printf("4\n");
   --num_lines;
   int max_lines = atoi(list[num_lines].c_str());
-  //printf("5\n");
   data_samples_.Resize(max_lines);
   data_samples_.Y.resize(1, NULL);
-  //printf("6\n");
   data_buf_.Resize(num_lines);
-  //printf("7\n");
   data_buf_.InitSparseRow(if_has_field);
-  //printf("8\n");
   sampled_length.clear();
-  //printf("9\n");
   parser_->Parse(list, data_buf_, sampled_length);
 }
 
@@ -157,24 +141,18 @@ int InmemReader::GetLineNumber(const char* buf, uint64 buf_size) {
 // Smaple data from memory buffer.
 int InmemReader::Samples(DMatrix* &matrix) {
   static int now_block = 0;
- // printf("s0\n");
- // printf("%d %lu\n", now_block, sampled_length.size());
   int num_lines = sampled_length[now_block];
- // printf("s1\n");
   if (pos_ == data_buf_.row_len) {
     now_block = 0;
     matrix = NULL;
     return 0;
   }
-  //printf("s2 %d %lu\n", now_block, data_buf_.Y.size());
   data_samples_.Y[0] = data_buf_.Y[now_block];
-  //printf("s3\n");
   for (int i = 0; i < num_lines; ++i) {
     // Copy data between different DMatrix.
     data_samples_.row[i] = data_buf_.row[pos_];
     pos_++;
   }
-  //printf("s4\n");
   now_block++;
   data_samples_.Setlength(num_lines);
   matrix = &data_samples_;

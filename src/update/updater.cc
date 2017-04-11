@@ -55,7 +55,7 @@ void Updater::Initialize(const HyperParam& hyper_param) {
 void Updater::Update(index_t key, real_t grad, Model* model) {
   // Do not check anything here
   //printf("key is %u\n", key);
-  std::unordered_map<index_t, real_t>* w = model->GetParameter();
+  std::vector<real_t>* w = model->GetParameter();
   // w -= eta * g
   (*w)[key] -= learning_rate_ * (RegularTerm((*w)[key]) + grad);
 }
@@ -66,7 +66,7 @@ void Updater::BatchUpdate(Gradient* grad, Model* model) {
   // g /= row_len
   //size_t end = model->GetLength();
   //grad->Div(grad->GetMiniBatchSize());
-  std::unordered_map<index_t, real_t>* w = model->GetParameter();
+  std::vector<real_t>* w = model->GetParameter();
   std::unordered_map<index_t, real_t>* grad_ = grad->GetDenseVector();
   std::unordered_map<index_t, real_t>::iterator it = grad_->begin();
   std::unordered_map<index_t, real_t>::iterator end = grad_->end();
@@ -98,7 +98,7 @@ void Updater::SeqUpdate(std::vector<real_t>& value,
                         Model* model) {
   //static float * regu = new float(value.size());
   index_t end = value.size();
-  std::unordered_map<index_t, real_t>* w = model->GetParameter();
+  std::vector<real_t>* w = model->GetParameter();
   __MX _learning_rate = _MMX_SET1_PS(learning_rate_);
   __MX _regu_lambda = _MMX_SET1_PS(regu_lambda_);
   for (index_t i = 0; i < end; i += _MMX_INCREMENT) {

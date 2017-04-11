@@ -29,10 +29,9 @@ void LogitLoss::Initialize(const HyperParam& hyper_param) {
   is_sparse_ = hyper_param.is_sparse;
   if (hyper_param.is_train) {
     grad_ = new Gradient;
-    grad_->Initialize(hyper_param.num_param);
+    grad_->Initialize(hyper_param.max_feature);
   }
   result.resize(hyper_param.batch_size, 0);
-  //printf("h_b_s is %u, re_si is %lu\n", hyper_param.batch_size, result.size());
 }
 
 // Math: [ (-y / ((1/exp(-y*<w,x>)) + 1)) * X]
@@ -42,43 +41,26 @@ void LogitLoss::CalcGrad(const DMatrix* matrix,
   CHECK_NOTNULL(matrix);
   CHECK_GT(matrix->row_len, 0);
   CHECK_NOTNULL(updater);
-  std::unordered_map<index_t, real_t> *w = param->GetParameter();
+  std::vector<real_t> *w = param->GetParameter();
   size_t row_len = matrix->row_len;
   // Calc real gradient
-  //printf("len is %lu", matrix->row_len);
-  //printf("c1\n");
   index_t num_y = matrix->Y[0]->size();
   wTx(matrix, w, result);
-  //printf("c2\n");
-  //printf(" num_y is %u result_size is %lu\n", num_y, result.size());
   for (size_t i = 0; i < num_y; ++i) {
     real_t y = (*matrix->Y[0])[i] > 0 ? 1.0 : -1.0;
-    //printf("y %f ", (*matrix->Y[0])[i]);
-    result[i] = -y / (1.0 + (1.0 / exp(-y * result[i])));
-    //printf("resu %f ", result[i]);
+    result[i] = -y / (1.0 + (1.0 / fasterexp(-y * result[i])));
   }
-  //printf("\n");
-  //printf("c3\n");
   real_t realGrad = 0.0;
   for (size_t i = 0; i < row_len; ++i) {
     SparseRow* row = matrix->row[i];
     index_t col_len = row->column_len;
-    //printf("column len is %u\n", col_len);
     for (size_t j = 0; j < col_len; ++j) {
-      //printf("%d:%f ", row->idx[j], row->X[j]);
-      //printf("%f ", realGrad);
       realGrad += result[row->idx[j]] * row->X[j];
     }
     realGrad /= num_y;
-    //printf("\n");
-    //printf("sssparse %d\n", is_sparse_);
-    //printf("a\n");
     grad_->Addgrad(row->id, realGrad);
-    //printf("b\n");
   }
-
   // Updating in dense model
-    //grad_->SetMiniBatchSize(row_len);
   updater->BatchUpdate(grad_, param);
   grad_->Reset();
 }

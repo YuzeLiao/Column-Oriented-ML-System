@@ -147,6 +147,9 @@ bool Initialize() {
   } else if (GetHyperParam()->model_type == FM) {
     GetHyperParam()->num_param = (GetHyperParam()->max_feature)
       * (1 + GetHyperParam()->num_factor);
+    printf("num_param is %u, max_f %u, num_fac %u\n", GetHyperParam()->num_param, 
+                                                         GetHyperParam()->max_feature,
+                                                         GetHyperParam()->num_factor);
   } else {
     GetHyperParam()->num_param = GetHyperParam()->max_feature;
   }
@@ -320,19 +323,13 @@ void StartTrainWork() {
 void Train(const vector<Reader*>& reader_list) {
   LOG(PRINT) << "Start to train model.";
   real_t tmp_loss = kFloatMax;
-  std::unordered_map<index_t, real_t> tmp_hash_map;
-  //if (GetHyperParam()->early_stop) {
-    //tmp_vec.resize(GetHyperParam()->num_param);
-  //}
+  std::vector<real_t> tmp_hash_map;
   DMatrix* matrix = nullptr;
   // train loop
   int count = 0;
   for (;;) {
-    //printf("t1\n");
     int record_num = reader_list[0]->Samples(matrix);
-    //printf("t2\n");
     if (record_num == 0) { // end of file
-    //printf("t3\n");
       reader_list[0]->GoToHead();
       // Evaluate current loss
       real_t current_loss =
@@ -347,7 +344,6 @@ void Train(const vector<Reader*>& reader_list) {
         GetModel()->Loadweight(tmp_hash_map);
         break;
       }
-      //printf("t4\n");
       // End of iteration
       if (++count >= GetHyperParam()->num_iteration) {
         break;
@@ -360,11 +356,9 @@ void Train(const vector<Reader*>& reader_list) {
       continue;
     }
     // Calc loss and update model parameter
-    //printf("t5\n");
     GetLoss()->CalcGrad(matrix,
                         GetModel().get(),
                         GetUpdater().get());
-    //printf("t6\n");
   }
   // Dump model to disk file
   GetModel()->SaveModel(GetHyperParam()->model_checkpoint_file);

@@ -54,9 +54,13 @@ class FMLoss : public Loss {
   index_t max_feature_;    // The number of feature.
   int num_factor_;         // The number of latent factor.
   TaskType task_type_;     // Classification or Regression
+  std::vector<real_t> tmp_result1;
+  std::vector<real_t> tmp_result2;
 
   // over-write wTx
-  real_t wTx(const SparseRow* row, const std::vector<real_t>* w);
+  void wTx(const DMatrix* matrix,
+           std::vector<real_t>* w,
+           std::vector<real_t>& result);
 
   DISALLOW_COPY_AND_ASSIGN(FMLoss);
 };

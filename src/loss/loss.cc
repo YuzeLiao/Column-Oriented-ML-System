@@ -25,7 +25,7 @@ This file is the implementation of the base Loss class.
 /* for class register */
 #include "src/loss/logit_loss.h"
 //#include "src/loss/linear_loss.h"
-//#include "src/loss/fm_loss.h"
+#include "src/loss/fm_loss.h"
 //#include "src/loss/ffm_loss.h"
 //#include "src/loss/svm_loss.h"
 
@@ -39,7 +39,7 @@ namespace f2m {
 CLASS_REGISTER_IMPLEMENT_REGISTRY(f2m_loss_registry, Loss);
 REGISTER_LOSS("lr", LogitLoss);
 //REGISTER_LOSS("linear", LinearLoss);
-//REGISTER_LOSS("fm", FMLoss);
+REGISTER_LOSS("fm", FMLoss);
 //REGISTER_LOSS("ffm", FFMLoss);
 //REGISTER_LOSS("svm", SVMLoss);
 
@@ -51,7 +51,7 @@ void Loss::Predict(const DMatrix* matrix,
   // The pred vector should be pre-initialized.
   CHECK_GT(pred.size(), 0);
   //CHECK_EQ(pred.size(), matrix->row_len);
-  std::unordered_map<index_t, real_t>* w = param->GetParameter();
+  std::vector<real_t>* w = param->GetParameter();
   wTx(matrix, w, pred);
 }
 
@@ -90,9 +90,10 @@ real_t Loss::hinge_loss(const std::vector<real_t>& pred,
 
 // Calculate wTx.
 void Loss::wTx(const DMatrix* matrix,
-               std::unordered_map<index_t, real_t>* w,
+               std::vector<real_t>* w,
                std::vector<real_t>& result) {
-  memset(result.data(), 0, sizeof(real_t) * result.size());
+  index_t num_y = matrix->Y[0]->size();
+  memset(result.data(), 0, sizeof(real_t) * num_y);
   //printf(" result size is %lu\n", result.size());
   size_t row_len = matrix->row_len;
   // Calc real gradient
@@ -100,7 +101,6 @@ void Loss::wTx(const DMatrix* matrix,
     SparseRow* row = matrix->row[i];
     real_t w_i = (*w)[row->id];
     index_t col_len = row->column_len;
-    //printf("w_[%d] is %f col_len is %u\n", row->id, w_i, col_len);
     for (size_t j = 0; j < col_len; ++j) {
       result[row->idx[j]] += w_i * row->X[j];
     }

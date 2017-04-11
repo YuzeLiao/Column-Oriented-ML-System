@@ -31,11 +31,14 @@ void FMLoss::Initialize(const HyperParam& hyper_param) {
   max_feature_ = hyper_param.max_feature;
   num_factor_ = hyper_param.num_factor;
   is_sparse_ = hyper_param.is_sparse;
-  if (hyper_param.is_train && !is_sparse_) {
+  if (hyper_param.is_train) {
     grad_ = new Gradient;
     grad_->Initialize(hyper_param.num_param);
   }
   task_type_ = hyper_param.task_type;
+  result.resize(hyper_param.batch_size, 0);
+  tmp_result1.resize(hyper_param.batch_size, 0);
+  tmp_result2.resize(hyper_param.batch_size, 0);
 }
 
 // Return cross-entropy loss.
@@ -43,11 +46,7 @@ real_t FMLoss::Evaluate(const std::vector<real_t>& pred,
                         const std::vector<real_t>& label) {
   CHECK_GT(pred.size(), 0);
   CHECK_GT(label.size(), 0);
-  if (task_type_ == Regression) {
-    return this->square_loss(pred, label);
-  } else {
-    return this->cross_entropy_loss(pred, label);
-  }
+  return this->cross_entropy_loss(pred, label);
 }
 
 // Math: [ partial_grad * X ] for linear term
@@ -63,86 +62,94 @@ void FMLoss::CalcGrad(const DMatrix* matrix,
   std::vector<real_t> *w = param->GetParameter();
   size_t row_len = matrix->row_len;
   // Calc real gradient
-  for (index_t i = 0; i < row_len; ++i) {
+  index_t num_y = matrix->Y[0]->size();
+  wTx(matrix, w, result);
+  for (size_t i = 0; i < num_y; ++i) {
+      real_t y = (*matrix->Y[0])[i] > 0 ? 1.0 : -1.0;
+      result[i] = -y / (1.0 + (1.0 /fasterexp(-y * result[i])));
+  }
+  for (size_t i = 0; i < row_len; ++i) {
     SparseRow* row = matrix->row[i];
     index_t col_len = row->column_len;
-    real_t pred = wTx(row, w);
-    real_t y = 0, pg = 0;
-    if (task_type_ == Regression) {
-      y = matrix->Y[i];
-      pg = pred - y;
-    } else {
-      y = matrix->Y[i] > 0 ? 1.0 : -1.0;
-      pg = -y / (1.0 + (1.0 / fasterexp(-y * pred)));
+    real_t realGrad = 0.0;
+    for (size_t j = 0; j < col_len; ++j) {
+      realGrad += result[row->idx[j]] * row->X[j];
     }
-    // for linear term
-    for (index_t j = 0; j < col_len; ++j) {
-      real_t realGrad = pg * row->X[j];
-      if (is_sparse_) {
-        updater->Update(row->idx[j], realGrad, param);
-      } else {
-        grad_->Addgrad(row->idx[j], realGrad);
-      }
-    }
-    // for latent factor
-    for (index_t k = 0; k < num_factor_; ++k) {
-      real_t v_mul_x = 0.0;
-      index_t fac_add_k = max_feature_ + k;
-      for (index_t j = 1; j < col_len; ++j) {
-        index_t pos = row->idx[j] * num_factor_ + fac_add_k;
-        real_t v = (*w)[pos];
-        real_t x = row->X[j];
-        v_mul_x += (x*v);
-      }
-      for (index_t j = 1; j < col_len; ++j) {
-        index_t pos = row->idx[j] * num_factor_ + fac_add_k;
-        real_t x = row->X[j];
-        real_t v = (*w)[pos];
-        real_t realGrad = (x*v_mul_x - v*x*x) * pg;
-        if (is_sparse_) {
-          updater->Update(pos, realGrad, param);
-        } else {
-          grad_->Addgrad(pos, realGrad);
-        }
-      }
-    }
+    realGrad /= num_y;
+    grad_->Addgrad(row->id, realGrad);
   }
-  // Updating in dense model
-  if (!is_sparse_) {
-    grad_->SetMiniBatchSize(row_len);
-    updater->BatchUpdate(grad_, param);
-    grad_->Reset();
+
+  for (size_t i = 1; i <= num_factor_; ++i) {
+    size_t bias = i * max_feature_;
+    for (size_t j = 1; j < row_len; ++j) {
+      SparseRow* row = matrix->row[j];
+      index_t col_len = row->column_len;
+      real_t w_i = (*w)[row->id + bias];
+      for (size_t k = 0; k < col_len; ++k) {
+        tmp_result2[row->idx[k]] +=  row->X[k] * w_i;
+      }
+    }
+    for (size_t j = 1; j < row_len; ++j) {
+      SparseRow* row = matrix->row[j];
+      index_t pos = row->id + bias;
+      index_t col_len = row->column_len;
+      real_t realGrad = 0.0;
+      real_t w_i = (*w)[pos];
+      for (size_t k = 0; k < col_len; ++k) {
+        real_t x = row->X[k];
+        index_t idx = row->idx[k];
+        realGrad += result[idx] * (tmp_result2[idx] - w_i * x) * x;
+      }
+      realGrad /= num_y;
+      grad_->Addgrad(pos, realGrad);
+    }
+    memset(tmp_result2.data(), 0, sizeof(real_t) * num_y);
   }
+  updater->BatchUpdate(grad_, param);
+  grad_->Reset();
 }
 
-// Math: [ pred = <w,x> + <v_i, v_j> * x_i * x_j ]
-// Here we use a mathmatic trick to reduce the complexity
-// from O(kn*n) to O(k*n)
-real_t FMLoss::wTx(const SparseRow* row, const std::vector<real_t>* w) {
-  real_t val =  0.0;
-  index_t col_len = row->column_len;
-  // linear term
-  for (index_t i = 0; i < col_len; ++i) {
-    index_t pos = row->idx[i];
-    val += (*w)[pos] * row->X[i];
-  }
-  // latent factor
-  real_t tmp = 0.0;
-  for (index_t k = 0; k < num_factor_; ++k) {
-    real_t square_sum = 0.0, sum_sqaure = 0.0;
-    for (index_t i = 0; i < col_len; ++i) {
-      real_t x = row->X[i];
-      index_t pos = row->idx[i] * num_factor_ + max_feature_ + k;
-      real_t v = (*w)[pos];
-      square_sum += (x*v);
-      sum_sqaure += (x*x*v*v);
-    }
-    square_sum *= square_sum;
-    tmp += (square_sum - sum_sqaure);
-  }
-  val += (0.5 * tmp);
 
-  return val;
+void FMLoss::wTx(const DMatrix* matrix,
+               std::vector<real_t>* w,
+               std::vector<real_t>& result) {
+  index_t num_y = matrix->Y[0]->size();
+  memset(result.data(), 0, sizeof(real_t) * num_y);
+  memset(tmp_result1.data(), 0, sizeof(real_t) * num_y);
+  memset(tmp_result2.data(), 0, sizeof(real_t) * num_y);
+  size_t row_len = matrix->row_len;
+  // Calc real gradient
+  for (size_t i = 0; i < row_len; ++i) {
+    SparseRow* row = matrix->row[i];
+    real_t w_i = (*w)[row->id];
+    index_t col_len = row->column_len;
+    for (size_t j = 0; j < col_len; ++j) {
+      result[row->idx[j]] += w_i * row->X[j];
+    }
+  }
+ 
+  for (size_t i = 1; i <= num_factor_; ++i) {
+    size_t bias = i * max_feature_;
+    for (size_t j = 1; j < row_len; ++j) {
+      SparseRow* row = matrix->row[j];
+      real_t w_i = (*w)[row->id + bias];
+     // printf("|%lu| ", row->id + bias);
+      index_t col_len = row->column_len;
+      for (size_t k = 0; k < col_len; ++k) {
+        real_t vx = row->X[k] * w_i;
+        tmp_result1[row->idx[k]] -= vx * vx;
+        tmp_result2[row->idx[k]] += vx;  
+      }
+    }
+    for (size_t k = 0; k < num_y; ++k) {
+      tmp_result1[k] += tmp_result2[k] * tmp_result2[k];
+      tmp_result2[k] = 0;
+    }
+  }
+  for (size_t i = 0; i < num_y; ++i) {
+    result[i] += 0.5 * tmp_result1[i];
+  }
+  //printf("\n\n\n");
 }
 
 } // namespace f2m
